@@ -49,6 +49,7 @@ def generate_model_input(env, normalize=False):
     binarized_maze_cells = np.unpackbits(expanded_maze_cells.astype('uint8'), axis=2)
     coordinates = env.unwrapped.state.astype('int')
     binarized_maze_cells[coordinates[0], coordinates[1], 3] = 1
+    binarized_maze_cells[binarized_maze_cells.shape[0] - 1, binarized_maze_cells.shape[1] - 1, 3] = -1
     binarized_maze_cells = binarized_maze_cells[:,:,3:8].astype('float')
     if normalize:
         normalized_maze_cells = normalize_input()
@@ -67,7 +68,7 @@ def select_action(model, state):
 def render_episode(env, model):
     env.reset()
     env.render()
-    s = generate_model_input(env, normalize=True)
+    s = generate_model_input(env, normalize=False)
     episode = []
     done = False
     while not done:
@@ -131,7 +132,7 @@ def train(model, env_name, num_episodes, optimizer, discount_factor, random_maze
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print('loss: ', loss)
+        print('Loss: ', loss.item())
         if i % 1 == 0:
             print('Number of steps taken to solve the maze: ', len(episode))
 
@@ -141,10 +142,10 @@ def train(model, env_name, num_episodes, optimizer, discount_factor, random_maze
 
 if __name__ == '__main__':
     model = PolicyNetwork(maze_size=5)
-    learn_rate = 0.01
+    learn_rate = 0.001
     optimizer = torch.optim.Adam(model.parameters(), learn_rate)
     # maze-sample-5x5-v0 for a fixed maze
-    train(model, "maze-sample-5x5-v0", 500, optimizer, 1, random_mazes=False)
+    train(model, "maze-random-5x5-v0", 500, optimizer, 1, random_mazes=False)
 
 
 
