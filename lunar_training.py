@@ -6,6 +6,7 @@ import torch.nn as nn
 
 import time
 from mutils import *
+from loss_utils import *
 from train_utils import train
 
 
@@ -41,9 +42,16 @@ class LunarLinearPolicyNetwork(nn.Module):
 
 
 if __name__ == '__main__':
-	set_seed(seed=44)
+	set_seed(seed=42)
 	env = gym.make("LunarLander-v2")
+	# env = gym.make("CartPole-v1")
 	env.seed(42)
-	model = LunarLinearPolicyNetwork()
-	optimizer = torch.optim.Adam(model.parameters(), lr=2e-3)
-	train(env=env, model=model, optimizer=optimizer, num_episodes=1000, discount_factor=0.99)
+	model = LunarLinearPolicyNetwork(num_inputs=8, num_actions=4)
+	optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_loss, discount_factor=0.99)
+	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_loss, discount_factor=0.99) 
+	train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_fork_update_loss, discount_factor=0.99)
+
+
+
+
