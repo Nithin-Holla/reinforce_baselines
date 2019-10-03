@@ -48,9 +48,9 @@ if __name__ == '__main__':
 	env.seed(42)
 	model = LunarLinearPolicyNetwork(num_inputs=8, num_actions=4)
 	optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_loss, discount_factor=0.99)
+	train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_loss, discount_factor=0.99)
 	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_loss, discount_factor=0.99) 
-	train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_fork_update_loss, discount_factor=0.99)
+	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_fork_update_loss, discount_factor=0.99)
 
 
 

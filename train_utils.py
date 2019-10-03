@@ -80,11 +80,12 @@ def run_episode(env, model, select_action=select_action_default,
 	return episode
 
 
-def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute_reinforce_loss):
+def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute_reinforce_loss,
+		  print_freq=10, final_render=True):
 
 	if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
 		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
-									   greedy_actions=True, render=False, beams_num=1, beam_freq=10,
+									   greedy_actions=True, render=False, beams_num=2, beam_freq=4,
 									   beams_greedy=False, discount_factor=discount_factor)
 	elif loss_fun == compute_reinforce_with_baseline_loss:
 		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
@@ -112,13 +113,13 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 		metric_avg[3,0] += episode[-1]["reward"]
 		metric_avg[:,1] += 1
 		actions_taken += [e["action"] for e in episode]
-		if (i+1) % 1 == 0:
+		if (i+1) % print_freq == 0:
 			metric_avg[:,0] = metric_avg[:,0] / metric_avg[:,1]
 			print("Iteration %i: Loss=%4.2f, Episode length=%4.2f, Sum rewards=%4.2f, Final reward=%4.2f" % (i+1, metric_avg[0,0], metric_avg[1,0], metric_avg[2,0], metric_avg[3,0]))
 			print("Action distribution: " + ", ".join(["%s: %4.2f%%" % (str(a), 100.0*sum([(a == at) for at in actions_taken])/len(actions_taken)) for a in set(actions_taken)]))
 			metric_avg[:,:] = 0
-
-	render_episode(env, model)
+	if final_render:
+		render_episode(env, model)
 
 
 
