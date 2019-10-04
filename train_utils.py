@@ -11,6 +11,20 @@ import matplotlib.pyplot as plt
 from loss_utils import *
 from mutils import *
 
+NUM_INTERACTIONS = 0
+def add_interaction():
+	global NUM_INTERACTIONS
+	NUM_INTERACTIONS += 1
+
+def reset_interactions():
+	global NUM_INTERACTIONS
+	NUM_INTERACTIONS = 0
+
+def get_interactions():
+	global NUM_INTERACTIONS
+	return NUM_INTERACTIONS
+
+
 
 def select_action_default(model, state, greedy=False):
 	state = torch.from_numpy(state).float().unsqueeze(dim=0) # Convert state from ndarray to tensor and add a fake batch dimension
@@ -58,6 +72,7 @@ def run_episode(env, model, select_action=select_action_default,
 	done = False
 	frame_iter = 0
 	beams_baseline = None
+	beams_returns = None
 	while not done:
 		beams_last_steps = None
 		if beams_num > 0 and frame_iter % beam_freq == 0: # It is intended to be true also at step 0
@@ -65,8 +80,10 @@ def run_episode(env, model, select_action=select_action_default,
 			beams = [call_beam(s) for _ in range(beams_num)]
 			beams_returns = [get_returns_from_rewards([e["reward"] for e in b], discount_factor) for b in beams]
 			beams_last_steps = [(beams[b_index][:beam_freq], beams_returns[b_index][:beam_freq]) for b_index in range(len(beams))]
-			beams_returns = [Gbr[0] for Gbr in beams_returns]
-			beams_baseline = sum(beams_returns)/len(beams_returns)
+			beams_returns = [sum([Gbr[baseline_step] if len(Gbr) > baseline_step else Gbr[-1] for Gbr in beams_returns])/len(beams_returns) for baseline_step in range(beam_freq)]
+		if beams_returns is not None:
+			beams_baseline = beams_returns[0]
+			del beams_returns[0]
 		action, log_p = select_action(model, s)
 		s_next, r, done, _ = env.step(action)
 		if render:
@@ -75,6 +92,7 @@ def run_episode(env, model, select_action=select_action_default,
 		episode += [{"state": s, "action": action, "log_p": log_p, "reward": r, "done" : done, "baseline": beams_baseline, "beams": beams_last_steps}]
 		s = s_next
 		frame_iter += 1
+		add_interaction()
 	if render:
 		env.close()
 	return episode
@@ -85,7 +103,7 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 
 	if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
 		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
-									   greedy_actions=True, render=False, beams_num=2, beam_freq=4,
+									   greedy_actions=True, render=False, beams_num=2, beam_freq=40,
 									   beams_greedy=False, discount_factor=discount_factor)
 	elif loss_fun == compute_reinforce_with_baseline_loss:
 		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
@@ -100,6 +118,7 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 	model = model.to(get_device())
 	metric_avg = np.zeros((4,2), dtype=np.float32)
 	actions_taken = []
+	reset_interactions()
 	for i in range(num_episodes):
 		episode = run_eps()
 		episode_durations.append(len(episode))
@@ -117,6 +136,7 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 			metric_avg[:,0] = metric_avg[:,0] / metric_avg[:,1]
 			print("Iteration %i: Loss=%4.2f, Episode length=%4.2f, Sum rewards=%4.2f, Final reward=%4.2f" % (i+1, metric_avg[0,0], metric_avg[1,0], metric_avg[2,0], metric_avg[3,0]))
 			print("Action distribution: " + ", ".join(["%s: %4.2f%%" % (str(a), 100.0*sum([(a == at) for at in actions_taken])/len(actions_taken)) for a in set(actions_taken)]))
+			print("Number of interactions so far: %i" % get_interactions())
 			metric_avg[:,:] = 0
 	if final_render:
 		render_episode(env, model)

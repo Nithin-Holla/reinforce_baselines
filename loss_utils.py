@@ -54,13 +54,14 @@ def compute_reinforce_with_baseline_fork_update_loss(episode, discount_factor):
 
 	for e_step_index, e in enumerate(episode):
 		if e["beams"] is not None:
-			baseline_Gts = [Gs[e_step_index]] + [b_Gt[0] for _, b_Gt in e["beams"]]
-			baseline_Gts = sum(baseline_Gts) / len(baseline_Gts)
+			beam_length = max([len(b_episode) for b_episode, b_GT in e["beams"]])
+			baseline_Gts = [[Gs[min(e_step_index+j,len(Gs)-1)]] + [b_Gt[min(j, len(b_Gt)-1)] for _, b_Gt in e["beams"]] for j in range(beam_length)]
+			baseline_Gts = [sum(baseGt) / len(baseGt) for baseGt in baseline_Gts]
 			for b_episode, b_Gt in e["beams"]:
 				for b_step_index in range(len(b_episode)):
 					Gs.append(b_Gt[b_step_index])
 					log_ps.append(b_episode[b_step_index]["log_p"])
-					baseline.append(baseline_Gts)
+					baseline.append(baseline_Gts[b_step_index])
 
 	# print("Length of Gs", len(Gs))
 

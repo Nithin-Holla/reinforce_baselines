@@ -7,6 +7,7 @@ from Box2D.b2 import (edgeShape, circleShape, fixtureDef, polygonShape, revolute
 import gym
 from gym import spaces
 from gym.utils import seeding, EzPickle
+from copy import copy, deepcopy
 
 # Rocket trajectory optimization is a classic topic in Optimal Control.
 #
@@ -102,6 +103,7 @@ class LunarLander(gym.Env, EzPickle):# stochasticity=INITIAL_RANDOM):
         else:
             # Nop, fire left engine, main engine, right engine
             self.action_space = spaces.Discrete(4)
+        self.ignore_reset = False
 
         self.reset()
 
@@ -121,6 +123,8 @@ class LunarLander(gym.Env, EzPickle):# stochasticity=INITIAL_RANDOM):
         self.world.DestroyBody(self.legs[1])
 
     def reset(self):
+        if self.ignore_reset:
+            return None
         self._destroy()
         self.world.contactListener_keepref = ContactDetector(self)
         self.world.contactListener = self.world.contactListener_keepref

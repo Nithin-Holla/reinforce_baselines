@@ -22,6 +22,8 @@ def run_action_episode(env, model, select_action=select_action_default,
 		s = env.reset()
 	else:
 		s = last_state
+		env.world.contactListener_keepref = ContactDetector(env)
+		env.world.contactListener = env.world.contactListener_keepref
 	if render:
 		env.render()
 	episode = []
@@ -32,7 +34,11 @@ def run_action_episode(env, model, select_action=select_action_default,
 		beams_actions = None
 		if beams_num > 0 and frame_iter % beam_freq == 0: # It is intended to be true also at step 0
 			# print("Running beams at frame iteration %i" % frame_iter)
+			if hasattr(env, "ignore_reset"):
+				env.ignore_reset = True
 			beams_actions = [call_beam(s) for _ in range(beams_num)]
+			if hasattr(env, "ignore_reset"):
+				env.ignore_reset = False
 			beams_actions = [([e["action"] for e in episode]+[a["action"] for a in b]) for b in beams_actions]
 		action, log_p = select_action(model, s)
 		s_next, r, done, _ = env.step(action)
@@ -58,7 +64,7 @@ def render_action_episode(env, seed, action_list):
 		img_list.append(env.render("rgb_array"))
 	env.close()
 	imgs = np.stack(img_list, axis=0).astype(np.uint8)
-	imgs = imgs[:,150:320]
+	# imgs = imgs[:,150:320]
 	return imgs
 
 
@@ -104,12 +110,14 @@ def imgs_to_gif(imgs, beam_imgs, filename, sequential_beams=False):
 if __name__ == '__main__':
 	if True or not os.path.isfile("visualization_imgs.npz"):
 		set_seed(seed=42)
-		env = gym.make("CartPole-v1") # gym.make("LunarLander-v2")
+		env = LunarLander()
 		env.seed(42)
-		model = LunarLinearPolicyNetwork(num_inputs=4, num_actions=2)
+		model = LunarLinearPolicyNetwork(num_inputs=8, num_actions=4)
 		optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-		train(env=env, model=model, optimizer=optimizer, num_episodes=70, loss_fun=compute_reinforce_with_baseline_fork_update_loss, discount_factor=0.99, final_render=False)
-		imgs, beam_imgs = visualize_treefork_algorithm(env=env, model=model, beams_num=4, beam_freq=80, seed=42)
+		print("Starting training...")
+		train(env=env, model=model, optimizer=optimizer, num_episodes=5, loss_fun=compute_reinforce_loss, discount_factor=0.99, final_render=False, print_freq=1)
+		print("Starting visualizing...")
+		imgs, beam_imgs = visualize_treefork_algorithm(env=env, model=model, beams_num=4, beam_freq=20, seed=42)
 		np.savez_compressed("visualization_imgs.npz", imgs=imgs, **beam_imgs, allow_pickle=True)
 	loaded_imgs = np.load("visualization_imgs.npz", allow_pickle=True)
 	for k in loaded_imgs:
