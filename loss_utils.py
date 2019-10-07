@@ -38,8 +38,8 @@ def compute_reinforce_with_baseline_loss(episode, discount_factor):
 	# print("Gs", Gs)
 	# print("baseline", baseline)
 
-	print("Gs", Gs)
-	print("Baseline", baseline)
+	# print("Gs", Gs)
+	# print("Baseline", baseline)
 	Gs = Gs - baseline
 	# Gs = Gs / Gs.std()
 	Gs = Gs / Gs.abs().mean()
@@ -76,8 +76,9 @@ def compute_reinforce_with_baseline_fork_update_loss(episode, discount_factor):
 	# print("Baseline", baseline)
 	Gs = Gs - baseline
 	# Gs = Gs / Gs.std()
-	Gs = Gs / Gs.abs().mean()
-	# print(Gs)
+	Gs = Gs / (Gs.abs().mean() + 1e-5)
+	# print("Gs postprocessing", Gs)
+	# print("log_ps", log_ps)
 	loss = - torch.mean(Gs * log_ps)
 	return loss
 

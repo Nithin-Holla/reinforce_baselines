@@ -1,4 +1,5 @@
 import numpy as np
+import math 
 
 import gym
 import torch
@@ -98,10 +99,76 @@ def run_episode(env, model, select_action=select_action_default,
 	return episode
 
 
+def run_episode_logN(env, model, select_action=select_action_default, 
+					greedy_actions=False, render=False, 
+					beams_num=-1, beam_start_freq=2, beams_greedy=False,
+					discount_factor=0.99):
+
+	call_beam = lambda state : run_episode(deepcopy(env), model, select_action, 
+										   greedy_actions=beams_greedy, render=False, 
+										   beams_num=-1, beam_freq=-1, beams_greedy=False, 
+										   discount_factor=discount_factor, last_state=state)
+
+	seed = random.randint(0, 10000)
+	env.seed(seed)
+	s = env.reset()
+	if render:
+		env.render()
+	episode = []
+	done = False
+	frame_iter = 0
+	while not done:
+		action, log_p = select_action(model, s)
+		s_next, r, done, _ = env.step(action)
+		if render:
+			env.render()
+			time.sleep(0.05)
+		episode += [{"state": s, "action": action, "log_p": log_p, "reward": r, "done" : done, "baseline": None, "beams": None}]
+		s = s_next
+		frame_iter += 1
+		add_interaction()
+	if render:
+		env.close()
+
+	episode_length = len(episode)
+	num_beam_start_states = math.ceil(math.log2(episode_length))
+	beam_start_states = sorted(list(set([(episode_length - 2**i) for i in range(beam_start_freq, num_beam_start_states)] + [0])))
+	print("Episode length", episode_length)
+	print("Beam start states", beam_start_states)
+	
+	beams_baseline = None
+	beams_returns = None
+	env.seed(seed)
+	s = env.reset()
+	for i in range(episode_length):
+		beams_last_steps = None
+		if i in beam_start_states:
+			# print("Running beams at frame iteration %i" % frame_iter)
+			beam_state = beam_start_states.index(i)
+			beam_freq = (beam_start_states[beam_state+1] if (beam_state+1)<len(beam_start_states) else (episode_length)) - i
+			beams = [call_beam(s) for _ in range(beams_num)]
+			beams_returns = [get_returns_from_rewards([e["reward"] for e in b], discount_factor) for b in beams]
+			beams_last_steps = [(beams[b_index][:beam_freq], beams_returns[b_index][:beam_freq]) for b_index in range(len(beams))]
+			beams_returns = [sum([Gbr[baseline_step] if len(Gbr) > baseline_step else Gbr[-1] for Gbr in beams_returns])/len(beams_returns) for baseline_step in range(beam_freq)]
+		if beams_returns is not None:
+			beams_baseline = beams_returns[0]
+			del beams_returns[0]
+		_ = env.step(episode[i]["action"])
+		episode[i]["baseline"] = beams_baseline
+		episode[i]["beams"] = beams_last_steps
+		# We do not add an interaction here because we just revisit the same trajectory as sampled above. 
+
+	return episode
+
+
 def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute_reinforce_loss,
 		  print_freq=10, final_render=True):
 
 	if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
+		run_eps = lambda : run_episode_logN(env, model, select_action=select_action_default,
+									   greedy_actions=True, render=False, beams_num=2, beam_start_freq=2,
+									   beams_greedy=False, discount_factor=discount_factor)
+	elif loss_fun == compute_reinforce_with_baseline_fork_update_loss:
 		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
 									   greedy_actions=True, render=False, beams_num=2, beam_freq=40,
 									   beams_greedy=False, discount_factor=discount_factor)
@@ -125,6 +192,7 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 		loss = loss_fun(episode, discount_factor)
 		optimizer.zero_grad()
 		loss.backward()
+		torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
 		optimizer.step()
 		metric_avg[0,0] += loss.item()
 		metric_avg[1,0] += len(episode)
