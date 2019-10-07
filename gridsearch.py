@@ -17,28 +17,31 @@ def perform_reinforce_with_baseline_gridsearch(learning_rates=[2e-3, 5e-3, 1e-2]
 	meta_information = ""
 	results = None
 
-	def add_result(episode_lens, param_dict):
+	def add_result(episode_lens, param_dict, meta_information, results):
 		if len(meta_information) > 0:
 			meta_information += "\n"
 		meta_information += ",".join(sorted([key + "=" + str(val) for key, val in param_dict.items()]))
-		episode_lens = np.array([episode_lens], dtype=np.int32)
 		if results is None:
-			results = episode_lens
+			results = episode_lens[None,:,:]
 		else:
-			results = np.concatenate([results, episode_lens], axis=0)
+			results = np.concatenate([results, episode_lens[None,:,:]], axis=0)
 		
 		with open(export_filename + "_meta.txt", "w") as f:
 			f.write(meta_information)
 		np.savez_compressed(export_filename+".npz", results)
+		return meta_information, results
 
 	exp_index = 0
+	num_exps = num_seeds * len(learning_rates) * len(number_of_beams) * len(intermediate_steps)
 	for seed in range(42, 42+num_seeds):
 		for lr in learning_rates:
 			for nr_beams in number_of_beams:
 				for beam_steps in intermediate_steps:
 					exp_index += 1
 					params = {"lr": lr, "nr_beams": nr_beams, "logbasis": beam_steps, "seed": seed}
-					print("Gridsearch experiment %i: params %s" % (exp_index, str(params)))
+					print("="*75)
+					print("Gridsearch experiment %i | %i: params %s" % (exp_index, num_exps, str(params)))
+					print("="*75)
 
 					set_seed(seed=seed)
 					env = gym.make("CartPole-v1")
@@ -57,9 +60,12 @@ def perform_reinforce_with_baseline_gridsearch(learning_rates=[2e-3, 5e-3, 1e-2]
 								print_freq=10, final_render=False, run_eps=run_eps, 
 								early_stopping=True)
 
-					add_result(res, params)
+					meta_information, results = add_result(res, params, meta_information, results)
+
+
+
 
 
 if __name__ == "__main__":
-	perform_reinforce_with_baseline_gridsearch()
+	perform_reinforce_with_baseline_gridsearch(num_episodes=50, learning_rates=[5e-3], number_of_beams=[(1, True)], intermediate_steps=[2,3,4])
 

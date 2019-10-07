@@ -141,8 +141,8 @@ def run_episode_logN(env, model, select_action=select_action_default,
 	episode_length = len(episode)
 	num_beam_start_states = math.ceil(math.log(episode_length, log_basis))
 	beam_start_states = sorted(list(set([(episode_length - log_basis**i) for i in range(beam_start_freq, num_beam_start_states)] + [0])))
-	print("Episode length", episode_length)
-	print("Beam start states", beam_start_states)
+	# print("Episode length", episode_length)
+	# print("Beam start states", beam_start_states)
 	
 	beams_baseline = None
 	beams_returns = None
@@ -187,14 +187,19 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 										   greedy_actions=False, render=False, beams_num=-1, beam_freq=-1,
 										   beams_greedy=False, discount_factor=discount_factor)
 
-	episode_durations = []
+	episode_infos = np.zeros((num_episodes,4), dtype=np.float32)
+
 	model = model.to(get_device())
 	metric_avg = np.zeros((4,2), dtype=np.float32)
 	actions_taken = []
 	reset_interactions()
+	start_time = time.time()
 	for i in range(num_episodes):
 		episode = run_eps()
-		episode_durations.append(len(episode))
+		episode_infos[i,0] = i
+		episode_infos[i,1] = len(episode)
+		episode_infos[i,2] = get_interactions()
+		episode_infos[i,3] = time.time() - start_time
 		loss = loss_fun(episode, discount_factor)
 		optimizer.zero_grad()
 		loss.backward()
@@ -212,12 +217,14 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 			print("Action distribution: " + ", ".join(["%s: %4.2f%%" % (str(a), 100.0*sum([(a == at) for at in actions_taken])/len(actions_taken)) for a in set(actions_taken)]))
 			print("Number of interactions so far: %i" % get_interactions())
 			metric_avg[:,:] = 0
-		if early_stopping and all([e == 500 for e in episode_durations[-50:]]):
-			episode_durations += [500] * (num_episodes - len(episode_durations))
-			break
+		if early_stopping and all([e == 500 for e in episode_infos[max(0,i-50):i,1]]):
+			episode_infos[i+1:,0] = np.arange(start=i+1, stop=num_episodes)
+			episode_infos[i+1:,1] = 500
+			episode_infos[i+1:,2] = episode_infos[i,2] + (episode_infos[i,2] - episode_infos[i-1,2]) * np.arange(start=1, stop=num_episodes-i)
+			episode_infos[i+1:,3] = episode_infos[i,3] + (episode_infos[i,2] - episode_infos[i-1,2]) * np.arange(start=1, stop=num_episodes-i)
 	if final_render:
 		render_episode(env, model)
-	return episode_durations
+	return episode_infos
 
 
 
