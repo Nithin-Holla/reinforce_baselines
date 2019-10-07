@@ -110,7 +110,7 @@ def run_episode(env, model, select_action=select_action_default,
 def run_episode_logN(env, model, select_action=select_action_default, 
 					greedy_actions=False, render=False, 
 					beams_num=-1, beam_start_freq=2, beams_greedy=False,
-					discount_factor=0.99):
+					discount_factor=0.99, log_basis=2):
 
 	call_beam = lambda state : run_episode(deepcopy(env), model, select_action, 
 										   greedy_actions=beams_greedy, render=False, 
@@ -139,8 +139,8 @@ def run_episode_logN(env, model, select_action=select_action_default,
 		env.close()
 
 	episode_length = len(episode)
-	num_beam_start_states = math.ceil(math.log2(episode_length))
-	beam_start_states = sorted(list(set([(episode_length - 2**i) for i in range(beam_start_freq, num_beam_start_states)] + [0])))
+	num_beam_start_states = math.ceil(math.log(episode_length, log_basis))
+	beam_start_states = sorted(list(set([(episode_length - log_basis**i) for i in range(beam_start_freq, num_beam_start_states)] + [0])))
 	print("Episode length", episode_length)
 	print("Beam start states", beam_start_states)
 	
@@ -170,20 +170,22 @@ def run_episode_logN(env, model, select_action=select_action_default,
 
 
 def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute_reinforce_loss,
-		  print_freq=10, final_render=True, select_action=select_action_default):
+		  print_freq=10, final_render=True, select_action=select_action_default, run_eps=None,
+		  early_stopping=False):
 
-	if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
-		run_eps = lambda : run_episode(env, model, select_action=select_action,
-									   greedy_actions=True, render=False, beams_num=2, beam_freq=40,
-									   beams_greedy=False, discount_factor=discount_factor)
-	elif loss_fun == compute_reinforce_with_baseline_loss:
-		run_eps = lambda : run_episode(env, model, select_action=select_action,
-									   greedy_actions=False, render=False, beams_num=4, beam_freq=2,
-									   beams_greedy=False, discount_factor=discount_factor)
-	elif loss_fun == compute_reinforce_loss:
-		run_eps = lambda : run_episode(env, model, select_action=select_action,
-									   greedy_actions=False, render=False, beams_num=-1, beam_freq=-1,
-									   beams_greedy=False, discount_factor=discount_factor)
+	if run_eps is None:
+		if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
+			run_eps = lambda : run_episode_logN(env, model, select_action=select_action,
+												greedy_actions=True, render=False, beams_num=2, beam_start_freq=2,
+												beams_greedy=False, discount_factor=discount_factor)
+		elif loss_fun == compute_reinforce_with_baseline_loss:
+			run_eps = lambda : run_episode(env, model, select_action=select_action,
+										   greedy_actions=False, render=False, beams_num=4, beam_freq=2,
+										   beams_greedy=False, discount_factor=discount_factor)
+		elif loss_fun == compute_reinforce_loss:
+			run_eps = lambda : run_episode(env, model, select_action=select_action,
+										   greedy_actions=False, render=False, beams_num=-1, beam_freq=-1,
+										   beams_greedy=False, discount_factor=discount_factor)
 
 	episode_durations = []
 	model = model.to(get_device())
@@ -210,8 +212,12 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 			print("Action distribution: " + ", ".join(["%s: %4.2f%%" % (str(a), 100.0*sum([(a == at) for at in actions_taken])/len(actions_taken)) for a in set(actions_taken)]))
 			print("Number of interactions so far: %i" % get_interactions())
 			metric_avg[:,:] = 0
+		if early_stopping and all([e == 500 for e in episode_durations[-50:]]):
+			episode_durations += [500] * (num_episodes - len(episode_durations))
+			break
 	if final_render:
 		render_episode(env, model)
+	return episode_durations
 
 
 
