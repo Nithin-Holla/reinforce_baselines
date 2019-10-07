@@ -7,7 +7,7 @@ import torch.nn as nn
 import time
 from copy import copy, deepcopy
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from loss_utils import *
 from mutils import *
 
@@ -34,6 +34,14 @@ def select_action_default(model, state, greedy=False):
 	else:
 		action = log_p.argmax().item()
 	return action, log_p[action]
+
+def select_action_with_stochasticity(model, state, p, num_actions, greedy=False):
+	action, log_p_action = select_action_default(model, state, greedy)
+
+	if random.random() < p:
+		action = np.random.randint(0,num_actions)
+		# print('randomly chosen action')
+	return action, log_p_action
 
 
 def render_episode(env, model, select_action=select_action_default):
@@ -99,18 +107,18 @@ def run_episode(env, model, select_action=select_action_default,
 
 
 def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute_reinforce_loss,
-		  print_freq=10, final_render=True):
+		  print_freq=10, final_render=True, select_action=select_action_default):
 
 	if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
-		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
+		run_eps = lambda : run_episode(env, model, select_action=select_action,
 									   greedy_actions=True, render=False, beams_num=2, beam_freq=40,
 									   beams_greedy=False, discount_factor=discount_factor)
 	elif loss_fun == compute_reinforce_with_baseline_loss:
-		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
+		run_eps = lambda : run_episode(env, model, select_action=select_action,
 									   greedy_actions=False, render=False, beams_num=4, beam_freq=2,
 									   beams_greedy=False, discount_factor=discount_factor)
 	elif loss_fun == compute_reinforce_loss:
-		run_eps = lambda : run_episode(env, model, select_action=select_action_default,
+		run_eps = lambda : run_episode(env, model, select_action=select_action,
 									   greedy_actions=False, render=False, beams_num=-1, beam_freq=-1,
 									   beams_greedy=False, discount_factor=discount_factor)
 
