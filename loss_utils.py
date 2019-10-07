@@ -82,3 +82,15 @@ def compute_reinforce_with_baseline_fork_update_loss(episode, discount_factor):
 	loss = - torch.mean(Gs * log_ps)
 	return loss
 
+
+def compute_lv_loss(episode, discount_factor):
+	Gs = get_returns_from_rewards([e["reward"] for e in episode], discount_factor)
+	log_ps = torch.stack([e["log_p"] for e in episode])
+	values = torch.stack([e["baseline"] for e in episode]).view(-1)
+
+	Gs = torch.tensor(Gs).to(get_device())
+
+	policy_loss = -torch.sum((Gs - values.detach()) * log_ps)
+	value_loss = 0.5 * nn.MSELoss()(Gs, values)
+	loss = policy_loss + value_loss
+	return loss
