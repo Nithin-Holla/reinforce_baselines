@@ -107,7 +107,7 @@ def run_episode(env, model, select_action=select_action_default,
 		if beams_returns is not None:
 			beams_baseline = beams_returns[0]
 			del beams_returns[0]
-		action, log_p = select_action(model, s)
+		action, log_p = select_action(model, s, greedy=greedy_actions)
 		s_next, r, done, _ = env.step(action)
 		if render:
 			env.render()
@@ -127,6 +127,7 @@ def run_episode_logN(env, model, select_action=select_action_default,
 					 greedy_actions=False, render=False,
 					 beams_num=-1, beam_start_freq=2, beams_greedy=False,
 					 discount_factor=0.99, log_basis=2):
+
 	call_beam = lambda state: run_episode(deepcopy(env), model, select_action,
 										  greedy_actions=beams_greedy, render=False,
 										  beams_num=-1, beam_freq=-1, beams_greedy=False,
@@ -141,7 +142,7 @@ def run_episode_logN(env, model, select_action=select_action_default,
 	done = False
 	frame_iter = 0
 	while not done:
-		action, log_p = select_action(model, s)
+		action, log_p = select_action(model, s, greedy=greedy_actions)
 		s_next, r, done, _ = env.step(action)
 		if render:
 			env.render()
@@ -161,26 +162,23 @@ def run_episode_logN(env, model, select_action=select_action_default,
 	
 	beams_baseline = None
 	beams_returns = None
+	num_actions = len(episode)
 	env.seed(seed)
 	s = env.reset()
 	for i in range(episode_length):
 		beams_last_steps = None
 		if i in beam_start_states:
-			# print("Running beams at frame iteration %i" % frame_iter)
 			beam_state = beam_start_states.index(i)
-			beam_freq = (beam_start_states[beam_state + 1] if (beam_state + 1) < len(beam_start_states) else (
-				episode_length)) - i
+			beam_freq = (beam_start_states[beam_state + 1] if (beam_state + 1) < len(beam_start_states) else (episode_length)) - i
 			beams = [call_beam(s) for _ in range(beams_num)]
+			num_actions += sum([len(b) for b in beams])
 			beams_returns = [get_returns_from_rewards([e["reward"] for e in b], discount_factor) for b in beams]
-			beams_last_steps = [(beams[b_index][:beam_freq], beams_returns[b_index][:beam_freq]) for b_index in
-								range(len(beams))]
-			beams_returns = [
-				sum([Gbr[baseline_step] if len(Gbr) > baseline_step else Gbr[-1] for Gbr in beams_returns]) / len(
-					beams_returns) for baseline_step in range(beam_freq)]
+			beams_last_steps = [(beams[b_index][:beam_freq], beams_returns[b_index][:beam_freq]) for b_index in range(len(beams))]
+			beams_returns = [sum([Gbr[baseline_step] if len(Gbr) > baseline_step else Gbr[-1] for Gbr in beams_returns]) / len(beams_returns) for baseline_step in range(beam_freq)]
 		if beams_returns is not None:
 			beams_baseline = beams_returns[0]
 			del beams_returns[0]
-		_ = env.step(episode[i]["action"])
+		s, _, _, _ = env.step(episode[i]["action"])
 		episode[i]["baseline"] = beams_baseline
 		episode[i]["beams"] = beams_last_steps
 	# We do not add an interaction here because we just revisit the same trajectory as sampled above.
@@ -221,8 +219,8 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 	if run_eps is None:
 		if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
 			run_eps = lambda: run_episode_logN(env, model, select_action=select_action,
-											   greedy_actions=True, render=False, beams_num=2, beam_start_freq=2,
-											   beams_greedy=False, discount_factor=discount_factor)
+											   greedy_actions=False, render=False, beams_num=2, beam_start_freq=2,
+											   log_basis=2, beams_greedy=False, discount_factor=discount_factor)
 		elif loss_fun == compute_reinforce_with_baseline_loss:
 			run_eps = lambda: run_episode(env, model, select_action=select_action,
 										  greedy_actions=False, render=False, beams_num=4, beam_freq=2,
@@ -268,11 +266,13 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 				 in set(actions_taken)]))
 			print("Number of interactions so far: %i" % get_interactions())
 			metric_avg[:,:] = 0
-		if early_stopping and all([e == 500 for e in episode_infos[max(0,i-50):i,1]]):
+		wind_size = 40
+		if early_stopping and all([e == 500 for e in episode_infos[max(0,i-wind_size):i+1,1]]):
 			episode_infos[i+1:,0] = np.arange(start=i+1, stop=num_episodes)
 			episode_infos[i+1:,1] = 500
-			episode_infos[i+1:,2] = episode_infos[i,2] + (episode_infos[i,2] - episode_infos[i-1,2]) * np.arange(start=1, stop=num_episodes-i)
-			episode_infos[i+1:,3] = episode_infos[i,3] + (episode_infos[i,2] - episode_infos[i-1,2]) * np.arange(start=1, stop=num_episodes-i)
+			episode_infos[i+1:,2] = episode_infos[i,2] + (episode_infos[i,2] - episode_infos[i-wind_size,2]) / wind_size * np.arange(start=1, stop=num_episodes-i)
+			episode_infos[i+1:,3] = episode_infos[i,3] + (episode_infos[i,3] - episode_infos[i-wind_size,3]) / wind_size * np.arange(start=1, stop=num_episodes-i)
+			break
 	if final_render:
 		render_episode(env, model)
 	return episode_infos

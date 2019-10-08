@@ -1,5 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt
+import random
+random.seed(43)
 
 
 def smooth_vals(vals, N=20):
@@ -26,27 +28,78 @@ def plot_gridsearch_result(meta_file, numpy_file):
 			experiments[exp_id] = []
 		experiments[exp_id].append(results[index])
 
-	fig, ax = plt.subplots(2)
+	fig, ax = plt.subplots(1, 3)
 
 	for exp_labels, exp_infos in experiments.items():
+
+		color = (random.random(), random.random(), random.random())
+
+		##########
+		## Plotting over iterations
+		##########
 		exp_infos = np.stack(exp_infos, axis=0)
 		episode_len_means = np.mean(exp_infos[:,:,1], axis=0)
 		episode_len_percentile_25 = np.percentile(exp_infos[:,:,1], q=25, axis=0)
 		episode_len_percentile_75 = np.percentile(exp_infos[:,:,1], q=75, axis=0)
 
-		episode_len_means = smooth_vals(episode_len_means, N=10)
-		episode_len_percentile_25 = smooth_vals(episode_len_percentile_25, N=10)
-		episode_len_percentile_75 = smooth_vals(episode_len_percentile_75, N=10)
+		smooth_window = 10
+		episode_len_means = smooth_vals(episode_len_means, N=smooth_window)
+		episode_len_percentile_25 = smooth_vals(episode_len_percentile_25, N=smooth_window)
+		episode_len_percentile_75 = smooth_vals(episode_len_percentile_75, N=smooth_window)
 
-		print("Episode x axis", exp_infos.shape)
-		print("Episode len means", episode_len_means.shape)
-		print("Episode len percentile 25", episode_len_percentile_25.shape)
-		print("Episode len percentile 75", episode_len_percentile_75.shape)
+		ax[0].plot(exp_infos[0,:,0], episode_len_means, color=color, label=exp_labels)
+		ax[0].fill_between(exp_infos[0,:,0], episode_len_percentile_25, episode_len_percentile_75, color=color, alpha=0.2)
+		ax[0].plot(exp_infos[0,:,0], episode_len_percentile_25, '--', color=color, alpha=0.5)
+		ax[0].plot(exp_infos[0,:,0], episode_len_percentile_75, '--', color=color, alpha=0.5)
 
-		ax[0].plot(exp_infos[0,:,0], episode_len_means, label=exp_labels)
-		ax[0].fill_between(exp_infos[0,:,0], episode_len_percentile_25, episode_len_percentile_75, alpha=0.2)
+		##########
+		## Plotting over number of interactions
+		##########
+		exp_infos_flatten = np.reshape(exp_infos, (exp_infos.shape[0] * exp_infos.shape[1], exp_infos.shape[2]) )
+		sort_indices = np.argsort(exp_infos_flatten[:,2])
+		exp_infos_episodes = exp_infos_flatten[sort_indices,1]
+		exp_infos_interactions = exp_infos_flatten[sort_indices,2]
+
+		smooth_window = 50
+		exp_infos_episodes_smoothed = smooth_vals(exp_infos_episodes, N=smooth_window)
+		exp_infos_episodes_stacked = np.stack([exp_infos_episodes[i:-(smooth_window-(i+1))] if i<smooth_window-1 else exp_infos_episodes[i:] for i in range(smooth_window)], axis=0)
+		exp_infos_episodes_percentile_25 = np.percentile(exp_infos_episodes_stacked, q=25, axis=0)
+		exp_infos_episodes_percentile_75 = np.percentile(exp_infos_episodes_stacked, q=75, axis=0)
+		exp_infos_episodes_percentile_25 = smooth_vals(exp_infos_episodes_percentile_25, N=smooth_window)
+		exp_infos_episodes_percentile_75 = smooth_vals(exp_infos_episodes_percentile_75, N=smooth_window)
+
+		ax[1].plot(exp_infos_interactions[:-smooth_window//2+1], exp_infos_episodes_smoothed[:-smooth_window//2+1], color=color, label=exp_labels)
+		ax[1].fill_between(exp_infos_interactions[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_25, exp_infos_episodes_percentile_75, color=color, alpha=0.2)
+		ax[1].plot(exp_infos_interactions[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_25, '--', color=color, alpha=0.5)
+		ax[1].plot(exp_infos_interactions[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_75, '--', color=color, alpha=0.5)
+
+		##########
+		## Plotting over time
+		##########
+		sort_indices = np.argsort(exp_infos_flatten[:,3])
+		exp_infos_episodes = exp_infos_flatten[sort_indices,1]
+		exp_infos_time = exp_infos_flatten[sort_indices,3]
+		print(exp_infos_time)
+
+		smooth_window = 50
+		exp_infos_episodes_smoothed = smooth_vals(exp_infos_episodes, N=smooth_window)
+		exp_infos_episodes_stacked = np.stack([exp_infos_episodes[i:-(smooth_window-(i+1))] if i<smooth_window-1 else exp_infos_episodes[i:] for i in range(smooth_window)], axis=0)
+		exp_infos_episodes_percentile_25 = np.percentile(exp_infos_episodes_stacked, q=25, axis=0)
+		exp_infos_episodes_percentile_75 = np.percentile(exp_infos_episodes_stacked, q=75, axis=0)
+		exp_infos_episodes_percentile_25 = smooth_vals(exp_infos_episodes_percentile_25, N=smooth_window)
+		exp_infos_episodes_percentile_75 = smooth_vals(exp_infos_episodes_percentile_75, N=smooth_window)
+
+		ax[2].plot(exp_infos_time[:-smooth_window//2+1], exp_infos_episodes_smoothed[:-smooth_window//2+1], color=color, label=exp_labels)
+		ax[2].fill_between(exp_infos_time[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_25, exp_infos_episodes_percentile_75, color=color, alpha=0.2)
+		ax[2].plot(exp_infos_time[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_25, '--', color=color, alpha=0.5)
+		ax[2].plot(exp_infos_time[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_75, '--', color=color, alpha=0.5)
+
 	ax[0].legend()
-	plt.savefig("gridsearch_figure.png")
+	ax[1].legend()
+	ax[2].legend()
+	plt.show()
+	# plt.savefig("gridsearch_figure.png")
 
 if __name__ == '__main__':
-	plot_gridsearch_result(meta_file="gridsearch_reinforce_with_baseline_meta.txt", numpy_file="gridsearch_reinforce_with_baseline.npz")
+	plot_gridsearch_result(meta_file="data_gridsearch/07_10_2019__20_07_59/gridsearch_reinforce_with_baseline_meta.txt", 
+						   numpy_file="data_gridsearch/07_10_2019__20_07_59/gridsearch_reinforce_with_baseline.npz")

@@ -3,8 +3,8 @@ import numpy as np
 import random
 
 def get_device():
-	# return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-	return torch.device("cpu")
+	return torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+	# return torch.device("cpu")
 
 def set_seed(seed=42):
 	random.seed(seed)
