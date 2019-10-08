@@ -151,6 +151,6 @@ def perform_reinforce_gridsearch(learning_rates=[4e-5, 1e-4, 4e-4, 1e-3],
 if __name__ == "__main__":
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=50, learning_rates=[5e-3], number_of_beams=[(1, True)], intermediate_steps=[2,3,4])
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=50, save_results=False)
-	perform_reinforce_gridsearch()
-	# perform_reinforce_with_baseline_gridsearch(num_episodes=500)
+	# perform_reinforce_gridsearch()
+	perform_reinforce_with_baseline_gridsearch(num_episodes=500, learning_rates=[1e-3, 2e-3, 4e-3], intermediate_steps=[2, 4])
 

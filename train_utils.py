@@ -219,7 +219,7 @@ def train(model, env, num_episodes, optimizer, discount_factor, loss_fun=compute
 	if run_eps is None:
 		if loss_fun == compute_reinforce_with_baseline_fork_update_loss:
 			run_eps = lambda: run_episode_logN(env, model, select_action=select_action,
-											   greedy_actions=False, render=False, beams_num=2, beam_start_freq=2,
+											   greedy_actions=False, render=False, beams_num=1, beam_start_freq=2,
 											   log_basis=2, beams_greedy=False, discount_factor=discount_factor)
 		elif loss_fun == compute_reinforce_with_baseline_loss:
 			run_eps = lambda: run_episode(env, model, select_action=select_action,

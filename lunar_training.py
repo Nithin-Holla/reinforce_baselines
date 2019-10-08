@@ -42,12 +42,12 @@ class LunarLinearPolicyNetwork(nn.Module):
 
 
 if __name__ == '__main__':
-	set_seed(seed=43)
+	set_seed(seed=42)
 	# env = gym.make("LunarLander-v2")
 	env = gym.make("CartPole-v1")
 	env.seed(42)
 	model = LunarLinearPolicyNetwork(num_inputs=4, num_actions=2)
-	optimizer = torch.optim.Adam(model.parameters(), lr=5e-3, weight_decay=1e-7)
+	optimizer = torch.optim.Adam(model.parameters(), lr=4e-4, weight_decay=1e-7)
 	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_loss, discount_factor=0.99)
 	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_loss, discount_factor=0.99) 
 	train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_fork_update_loss, discount_factor=0.99, print_freq=1)

@@ -29,10 +29,23 @@ def plot_gridsearch_result(meta_file, numpy_file):
 		experiments[exp_id].append(results[index])
 
 	fig, ax = plt.subplots(1, 3)
+	prev_colors = []
 
 	for exp_labels, exp_infos in experiments.items():
+		print(exp_labels)
+		# if not "nr_beams=(4, False)" in exp_labels or not "lr=0.002" in exp_labels:
+		# 	continue
+		if not "lr=4e-05" in exp_labels:
+			continue
 
-		color = (random.random(), random.random(), random.random())
+		color = None
+		color_iter = 0
+		while color is None:
+			color_iter += 1
+			color = (random.random(), random.random(), random.random())
+			if any([sum([abs(color[j]-c[j]) for j in range(3)]) < 0.9**color_iter for c in prev_colors]):
+				color = None
+		prev_colors.append(color)
 
 		##########
 		## Plotting over iterations
@@ -43,6 +56,7 @@ def plot_gridsearch_result(meta_file, numpy_file):
 		episode_len_percentile_75 = np.percentile(exp_infos[:,:,1], q=75, axis=0)
 
 		smooth_window = 10
+		# smooth_window = 50
 		episode_len_means = smooth_vals(episode_len_means, N=smooth_window)
 		episode_len_percentile_25 = smooth_vals(episode_len_percentile_25, N=smooth_window)
 		episode_len_percentile_75 = smooth_vals(episode_len_percentile_75, N=smooth_window)
@@ -61,6 +75,7 @@ def plot_gridsearch_result(meta_file, numpy_file):
 		exp_infos_interactions = exp_infos_flatten[sort_indices,2]
 
 		smooth_window = 50
+		# smooth_window = 500
 		exp_infos_episodes_smoothed = smooth_vals(exp_infos_episodes, N=smooth_window)
 		exp_infos_episodes_stacked = np.stack([exp_infos_episodes[i:-(smooth_window-(i+1))] if i<smooth_window-1 else exp_infos_episodes[i:] for i in range(smooth_window)], axis=0)
 		exp_infos_episodes_percentile_25 = np.percentile(exp_infos_episodes_stacked, q=25, axis=0)
@@ -82,6 +97,7 @@ def plot_gridsearch_result(meta_file, numpy_file):
 		print(exp_infos_time)
 
 		smooth_window = 50
+		# smooth_window = 500
 		exp_infos_episodes_smoothed = smooth_vals(exp_infos_episodes, N=smooth_window)
 		exp_infos_episodes_stacked = np.stack([exp_infos_episodes[i:-(smooth_window-(i+1))] if i<smooth_window-1 else exp_infos_episodes[i:] for i in range(smooth_window)], axis=0)
 		exp_infos_episodes_percentile_25 = np.percentile(exp_infos_episodes_stacked, q=25, axis=0)
@@ -94,12 +110,28 @@ def plot_gridsearch_result(meta_file, numpy_file):
 		ax[2].plot(exp_infos_time[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_25, '--', color=color, alpha=0.5)
 		ax[2].plot(exp_infos_time[smooth_window//2:-smooth_window//2+1], exp_infos_episodes_percentile_75, '--', color=color, alpha=0.5)
 
-	ax[0].legend()
-	ax[1].legend()
+	fig.suptitle("REINFORCE over different learning rates", fontsize=14)
+
+	ax[0].title.set_text("Mean episode length over training iterations")
+	ax[0].set_xlabel("Iterations")
+	ax[0].set_ylabel("Episode length")
+
+	ax[1].title.set_text("Mean episode length over interactions")
+	ax[1].set_xlabel("Interactions with environment")
+	ax[1].set_ylabel("Episode length")
+
+	ax[2].title.set_text("Mean episode length over time")
+	ax[2].set_xlabel("Time in seconds")
+	ax[2].set_ylabel("Episode length")
+
+	#ax[0].legend()
+	#ax[1].legend()
 	ax[2].legend()
 	plt.show()
 	# plt.savefig("gridsearch_figure.png")
 
 if __name__ == '__main__':
-	plot_gridsearch_result(meta_file="data_gridsearch/07_10_2019__20_07_59/gridsearch_reinforce_with_baseline_meta.txt", 
-						   numpy_file="data_gridsearch/07_10_2019__20_07_59/gridsearch_reinforce_with_baseline.npz")
+	# plot_gridsearch_result(meta_file="data_gridsearch/07_10_2019__21_46_17/gridsearch_reinforce_with_baseline_meta.txt", 
+	# 					   numpy_file="data_gridsearch/07_10_2019__21_46_17/gridsearch_reinforce_with_baseline.npz")
+	plot_gridsearch_result(meta_file="data_gridsearch/07_10_2019__23_24_46/gridsearch_reinforce_meta.txt",
+						   numpy_file="data_gridsearch/07_10_2019__23_24_46/gridsearch_reinforce.npz")
