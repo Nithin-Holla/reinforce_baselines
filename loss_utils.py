@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 from mutils import *
 
 
-def get_returns_from_rewards(rewards, discount_factor):
+def get_returns_from_rewards(rewards, discount_factor, initial_val=0):
 	T = len(rewards)
 	G_t = np.zeros((T,), dtype=np.float32)
-	G_t[-1] = rewards[-1]
+	G_t[-1] = discount_factor * initial_val + rewards[-1]
 	for i in range(T-2, -1, -1):
 		G_t[i] = discount_factor * G_t[i+1] + rewards[i]
 	return G_t
@@ -86,18 +86,24 @@ def compute_reinforce_with_baseline_fork_update_loss(episode, discount_factor):
 
 
 def compute_lv_loss(episode, discount_factor, alpha=0.5):
-	Gs = get_returns_from_rewards([e["reward"] for e in episode], discount_factor)
+	if len(episode) == 500:
+		Gs = get_returns_from_rewards([e["reward"] for e in episode], discount_factor, initial_val=episode[-1]["baseline"])
+	else:
+		Gs = get_returns_from_rewards([e["reward"] for e in episode], discount_factor)
 	
 	log_ps = torch.stack([e["log_p"] for e in episode])
 	values = torch.stack([e["baseline"] for e in episode]).view(-1)
 	Gs = torch.tensor(Gs).to(get_device())
-	Gs = Gs / (Gs.abs().mean() + 1e-5)
-	value_loss =  nn.MSELoss()(Gs, values)
+	Gs = (Gs / 100) * 2 - 1
+	# Gs = Gs / (Gs.abs().mean() + 1e-5)
+	value_loss = torch.mean((Gs - values) ** 2)
 	
 
 	adv = Gs - values.detach()
 	
-	policy_loss = -torch.sum(adv * log_ps)
+	policy_loss = -torch.mean(adv * log_ps)
+	# print("Policy loss: %4.2f, Value loss: %4.2f, Alpha: %4.2f" % (policy_loss.item(), value_loss.item(), alpha))
+	#print("Mean val: %4.2f" % values.mean().item(), "Mean probs: %4.2f" % log_ps.mean().item(), "Mean Gs: %4.2f" % Gs.mean().item())
 	
 	loss = (1-alpha)*policy_loss + alpha*value_loss
 	return loss

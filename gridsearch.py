@@ -148,7 +148,7 @@ def perform_reinforce_gridsearch(learning_rates=[4e-5, 1e-4, 4e-4, 1e-3],
 				meta_information, results = add_result(res, params, meta_information, results)
 
 def perform_lv_gridsearch(learning_rates=[5e-4, 1e-3, 5e-3, 1e-2],
-						  	alphas = [0.25,0.5,0.75],
+						  	alphas = [0.5,0.75],
 						  	num_seeds=32,
 						  	num_episodes=2000,
 							discount_factor=0.99,
@@ -201,9 +201,11 @@ def perform_lv_gridsearch(learning_rates=[5e-4, 1e-3, 5e-3, 1e-2],
 				model = LearnedValueNetwork(num_inputs=4, num_actions=2)
 				optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-7)
 				loss_fun = lambda x, y: compute_lv_loss(x, y, alpha=alpha)
+				run_eps = lambda: run_episode_lv(env, model, select_action=select_action_lv,
+											 	 render=False, discount_factor=discount_factor)
 				res = train(env=env, model=model, select_action=select_action_lv, optimizer=optimizer, num_episodes=1000, 
-					  loss_fun=compute_lv_loss, discount_factor=discount_factor, print_freq=50, final_render=False,
-					  early_stopping=False)
+							loss_fun=loss_fun, discount_factor=discount_factor, print_freq=50, final_render=False,
+							early_stopping=False, run_eps=run_eps)
 
 				if save_results:
 					meta_information, results = add_result(res, params, meta_information, results)
@@ -214,7 +216,7 @@ def perform_lv_gridsearch(learning_rates=[5e-4, 1e-3, 5e-3, 1e-2],
 if __name__ == "__main__":
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=50, learning_rates=[5e-3], number_of_beams=[(1, True)], intermediate_steps=[2,3,4])
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=50, save_results=False)
-	perform_reinforce_gridsearch()
-	# perform_lv_gridsearch()
+	# perform_reinforce_gridsearch()
+	perform_lv_gridsearch(save_results=False)
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=500, learning_rates=[1e-3, 2e-3, 4e-3], intermediate_steps=[2, 4])
 

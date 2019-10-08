@@ -16,15 +16,15 @@ class LearnedValueNetwork(nn.Module):
 		self.shared_layers = nn.Sequential(*shared_layers)
 		self.policy_layer = nn.Sequential(nn.Linear(hidden_dims[-1], num_actions),
 										  nn.LogSoftmax(dim=-1))
-		self.value_layer = nn.Sequential(nn.Linear(hidden_dims[-1], 1))
+		self.value_layer = nn.Sequential(nn.Linear(hidden_dims[-1], 1), nn.Tanh())
 		self.to(get_device())
 
 	def _block(self, c_in, c_out):
 		return [
 			nn.Linear(c_in, c_out),
-			# nn.ELU(),
-			nn.ReLU()
-			# nn.LayerNorm(c_out)
+			nn.ELU(),
+			# nn.ReLU()
+			nn.LayerNorm(c_out)
 		]
 
 	def forward(self, x):
