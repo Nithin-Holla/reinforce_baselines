@@ -87,7 +87,8 @@ def compute_reinforce_with_baseline_fork_update_loss(episode, discount_factor):
 
 def compute_lv_loss(episode, discount_factor, alpha=0.5):
 	if len(episode) == 500:
-		Gs = get_returns_from_rewards([e["reward"] for e in episode], discount_factor, initial_val=episode[-1]["baseline"])
+		Gs = get_returns_from_rewards([e["reward"] for e in episode], discount_factor, initial_val=(episode[-1]["baseline"].detach() + 1) * 50.0)
+		# print("Initial val: %4.2f" % episode[-1]["baseline"].detach().item(), ", Gs initial: %4.2f" % Gs[-1], ", Gs last: %4.2f" % Gs[0])
 	else:
 		Gs = get_returns_from_rewards([e["reward"] for e in episode], discount_factor)
 	
@@ -103,7 +104,7 @@ def compute_lv_loss(episode, discount_factor, alpha=0.5):
 	
 	policy_loss = -torch.mean(adv * log_ps)
 	# print("Policy loss: %4.2f, Value loss: %4.2f, Alpha: %4.2f" % (policy_loss.item(), value_loss.item(), alpha))
-	#print("Mean val: %4.2f" % values.mean().item(), "Mean probs: %4.2f" % log_ps.mean().item(), "Mean Gs: %4.2f" % Gs.mean().item())
+	# print("Mean val: %4.2f" % values.mean().item(), "Mean probs: %4.2f" % log_ps.mean().item(), "Mean Gs: %4.2f" % Gs.mean().item())
 	
 	loss = (1-alpha)*policy_loss + alpha*value_loss
 	return loss

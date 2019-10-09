@@ -147,8 +147,8 @@ def perform_reinforce_gridsearch(learning_rates=[4e-5, 1e-4, 4e-4, 1e-3],
 			if save_results:
 				meta_information, results = add_result(res, params, meta_information, results)
 
-def perform_lv_gridsearch(learning_rates=[5e-4, 1e-3, 5e-3, 1e-2],
-						  	alphas = [0.5,0.75],
+def perform_lv_gridsearch(learning_rates=[2e-4, 5e-4, 1e-3],
+						  	alphas=[0.5,0.25,0.75,0.1,0.9],
 						  	num_seeds=32,
 						  	num_episodes=2000,
 							discount_factor=0.99,
@@ -175,11 +175,11 @@ def perform_lv_gridsearch(learning_rates=[5e-4, 1e-3, 5e-3, 1e-2],
 		np.savez_compressed(base_dir + export_filename+".npz", results)
 		return meta_information, results
 
-	print(("*"*80+"\n")*2 + "Starting gridsearch for REINFORCE with learned value baseline with %i learning rates..." % len(learning_rates))
+	print(("*"*80+"\n")*2 + "Starting gridsearch for Actor Critic Learned Value Function with %i learning rates and %i alphas..." % (len(learning_rates), len(alphas)))
 	print(("*"*80+"\n")*2)
 
 	exp_index = 0
-	num_exps = num_seeds * len(learning_rates)
+	num_exps = num_seeds * len(learning_rates) * len(alphas)
 	start_time = time.time()
 	for seed in range(42, 42+num_seeds):
 		for lr in learning_rates:
@@ -217,6 +217,6 @@ if __name__ == "__main__":
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=50, learning_rates=[5e-3], number_of_beams=[(1, True)], intermediate_steps=[2,3,4])
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=50, save_results=False)
 	# perform_reinforce_gridsearch()
-	perform_lv_gridsearch(save_results=False)
+	perform_lv_gridsearch()
 	# perform_reinforce_with_baseline_gridsearch(num_episodes=500, learning_rates=[1e-3, 2e-3, 4e-3], intermediate_steps=[2, 4])
 
