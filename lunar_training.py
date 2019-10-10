@@ -7,7 +7,7 @@ import torch.nn as nn
 import time
 from mutils import *
 from loss_utils import *
-from train_utils import train
+from train_utils import *
 
 
 class LunarLinearPolicyNetwork(nn.Module):
@@ -43,14 +43,28 @@ class LunarLinearPolicyNetwork(nn.Module):
 
 if __name__ == '__main__':
 	set_seed(seed=42)
-	# env = gym.make("LunarLander-v2")
-	env = gym.make("CartPole-v1")
+	env = gym.make("LunarLander-v2")
+	# env = gym.make("CartPole-v1")
 	env.seed(42)
-	model = LunarLinearPolicyNetwork(num_inputs=4, num_actions=2)
-	optimizer = torch.optim.Adam(model.parameters(), lr=4e-4, weight_decay=1e-7)
+	model = LunarLinearPolicyNetwork(num_inputs=8, num_actions=4)
+	optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-7)
 	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_loss, discount_factor=0.99)
 	# train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_loss, discount_factor=0.99) 
-	train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_fork_update_loss, discount_factor=0.99, print_freq=1)
+	train(env=env, model=model, optimizer=optimizer, num_episodes=1000, loss_fun=compute_reinforce_with_baseline_fork_update_loss, discount_factor=0.99, print_freq=1,
+			run_eps = lambda : run_episode_logN_copy_env(env, model, select_action=select_action_default,
+								greedy_actions=False, render=False, beams_num=1, beam_start_freq=1,
+								log_basis=4, beams_greedy=False, discount_factor=0.99))
+
+	# set_seed(seed=42)
+	# eps_1 = run_episode_logN(env, model, select_action=select_action_default,
+	# 							greedy_actions=False, render=False, beams_num=1, beam_start_freq=2,
+	# 							log_basis=2, beams_greedy=False, discount_factor=0.99)
+	# set_seed(seed=42)
+	# eps_2 = run_episode_logN_copy_env(env, model, select_action=select_action_default,
+	# 							greedy_actions=False, render=False, beams_num=1, beam_start_freq=1,
+	# 							log_basis=4, beams_greedy=False, discount_factor=0.99)
+	# # print("Eps 1", eps_1[-4])
+	# print("Eps 2", eps_2[-4])
 
 
 

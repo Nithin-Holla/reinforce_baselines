@@ -186,6 +186,81 @@ def run_episode_logN(env, model, select_action=select_action_default,
 	return episode
 
 
+def run_episode_logN_copy_env(env, model, select_action=select_action_default,
+							  greedy_actions=False, render=False,
+							  beams_num=-1, beam_start_freq=2, beams_greedy=False,
+							  discount_factor=0.99, log_basis=2):
+
+	call_beam = lambda state: run_episode(deepcopy(env), model, select_action,
+										  greedy_actions=beams_greedy, render=False,
+										  beams_num=-1, beam_freq=-1, beams_greedy=False,
+										  discount_factor=discount_factor, last_state=state)
+
+	seed = random.randint(0, 10000)
+	env.seed(seed)
+	s = env.reset()
+	if render:
+		env.render()
+	episode = []
+	done = False
+	frame_iter = 0
+	while not done:
+		action, log_p = select_action(model, s, greedy=greedy_actions)
+		s_next, r, done, _ = env.step(action)
+		if render:
+			env.render()
+			time.sleep(0.05)
+		episode += [{"state": s, "action": action, "log_p": log_p, "reward": r, "done" : done, "baseline": None, "beams": None}]
+		s = s_next
+		frame_iter += 1
+		add_interaction()
+	if render:
+		env.close()
+
+	episode_length = len(episode)
+	num_beam_start_states = math.ceil(math.log(episode_length, log_basis))
+	beam_start_states = sorted(list(set([(episode_length - log_basis**i) for i in range(beam_start_freq, num_beam_start_states)] + [0])))
+	# print("Episode length", episode_length)
+	# print("Beam start states", beam_start_states)
+	
+	all_beams_steps = dict()
+	num_actions = len(episode)
+	for bstate in beam_start_states:
+		for b_num in range(beams_num):
+			env.seed(seed)
+			s = env.reset()
+			for i in range(episode_length):
+				if i == bstate:
+					beam_state = beam_start_states.index(i)
+					beam_freq = (beam_start_states[beam_state + 1] if (beam_state + 1) < len(beam_start_states) else (episode_length)) - i
+					beams = [call_beam(s)]
+					num_actions += sum([len(b) for b in beams])
+					if i not in all_beams_steps:
+						all_beams_steps[i] = (beams, beam_freq)
+					else:
+						all_beams_steps[i] = (all_beams_steps[i][0] + beams, beam_freq)
+					break
+				s, _, _, _ = env.step(episode[i]["action"])
+	
+	beams_baseline = None
+	beams_returns = None
+	for i in range(episode_length):
+		beams_last_steps = None
+		if i in beam_start_states:
+			beams, beam_freq = all_beams_steps[i]
+			beams_returns = [get_returns_from_rewards([e["reward"] for e in b], discount_factor) for b in beams]
+			beams_last_steps = [(beams[b_index][:beam_freq], beams_returns[b_index][:beam_freq]) for b_index in range(len(beams))]
+			beams_returns = [sum([Gbr[baseline_step] if len(Gbr) > baseline_step else Gbr[-1] for Gbr in beams_returns]) / len(beams_returns) for baseline_step in range(beam_freq)]
+		if beams_returns is not None:
+			beams_baseline = beams_returns[0]
+			del beams_returns[0]	
+		episode[i]["baseline"] = beams_baseline
+		episode[i]["beams"] = beams_last_steps
+		# We do not add an interaction here because we just revisit the same trajectory as sampled above.
+
+	return episode
+
+
 def run_episode_lv(env, model, select_action=select_action_lv, render=False,
 				   discount_factor=0.99, last_state=None):
 	if last_state is None:
